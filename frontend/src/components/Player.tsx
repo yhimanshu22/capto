@@ -15,6 +15,7 @@ export default function Player() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const playbackRateRef = useRef(1);
 
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
@@ -106,6 +107,7 @@ export default function Player() {
 
   const handleSpeedChange = (rate: number) => {
     setPlaybackRate(rate);
+    playbackRateRef.current = rate;
     if (videoRef.current) {
       videoRef.current.playbackRate = rate;
     }
@@ -228,12 +230,17 @@ export default function Player() {
               className="w-full h-full block"
               onPlay={() => {
                 if (videoRef.current) {
-                  videoRef.current.playbackRate = playbackRate;
+                  videoRef.current.playbackRate = playbackRateRef.current;
                 }
               }}
               onLoadedMetadata={() => {
                 if (videoRef.current) {
-                  videoRef.current.playbackRate = playbackRate;
+                  videoRef.current.playbackRate = playbackRateRef.current;
+                }
+              }}
+              onRateChange={() => {
+                if (videoRef.current && videoRef.current.playbackRate !== playbackRateRef.current) {
+                  videoRef.current.playbackRate = playbackRateRef.current;
                 }
               }}
             />
