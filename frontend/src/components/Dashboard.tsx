@@ -5,6 +5,7 @@ import {
   Check, Copy, AlertCircle, Video 
 } from 'lucide-react';
 import { Recording } from '../types';
+import Modal from './Modal';
 
 export default function Dashboard() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
@@ -12,6 +13,38 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalConfirmAction, setModalConfirmAction] = useState<(() => void) | null>(null);
+  const [modalCancelAction, setModalCancelAction] = useState<(() => void) | undefined>(undefined);
+  const [modalDanger, setModalDanger] = useState(false);
+  const [modalConfirmText, setModalConfirmText] = useState('Confirm');
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void, isDanger = false) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalConfirmAction(() => () => {
+      onConfirm();
+      setModalOpen(false);
+    });
+    setModalCancelAction(() => () => setModalOpen(false));
+    setModalDanger(isDanger);
+    setModalConfirmText(isDanger ? 'Delete' : 'Confirm');
+    setModalOpen(true);
+  };
+
+  const showAlert = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalConfirmAction(() => () => setModalOpen(false));
+    setModalCancelAction(undefined);
+    setModalDanger(false);
+    setModalConfirmText('OK');
+    setModalOpen(true);
+  };
 
   // Load recordings on mount
   useEffect(() => {
@@ -36,25 +69,28 @@ export default function Dashboard() {
     }
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this recording? This cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/recordings/${id}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        setRecordings(recordings.filter(rec => rec.id !== id));
-      } else {
-        alert('Failed to delete recording');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Network error trying to delete recording');
-    }
+    showConfirm(
+      'Delete Recording',
+      'Are you sure you want to delete this recording? This action cannot be undone.',
+      async () => {
+        try {
+          const response = await fetch(`/api/recordings/${id}`, {
+            method: 'DELETE',
+          });
+          if (response.ok) {
+            setRecordings(prev => prev.filter(rec => rec.id !== id));
+          } else {
+            showAlert('Delete Failed', 'We could not delete the recording from the server.');
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert('Network Error', 'An error occurred while attempting to reach the server.');
+        }
+      },
+      true
+    );
   };
 
   const handleShare = (id: string, e: React.MouseEvent) => {
@@ -190,13 +226,17 @@ export default function Dashboard() {
                 onClick={() => navigate(`/share/${rec.id}`)}
               >
                 {/* Visual Video Card Preview */}
-                <div className="h-40 bg-gradient-to-br from-violet-50/50 to-indigo-50/50 flex items-center justify-center relative overflow-hidden border-b border-slate-100">
-                  <div className="absolute inset-4 rounded-xl border border-dashed border-violet-100 bg-white/40 flex items-center justify-center transition-all group-hover:scale-95">
-                    <Video size={40} className="text-violet-300" />
-                  </div>
+                <div className="h-40 bg-slate-950 flex items-center justify-center relative overflow-hidden border-b border-slate-100">
+                  <video 
+                    src={`/videos/${rec.fileName}#t=0.1`} 
+                    preload="metadata" 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover opacity-80 group-hover:scale-105 group-hover:opacity-100 transition-all duration-350 pointer-events-none"
+                  />
 
                   {/* Play icon overlay */}
-                  <div className="absolute bg-violet-600/90 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200">
+                  <div className="absolute bg-violet-600/90 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 pointer-events-none">
                     <Play size={20} fill="#fff" className="ml-0.5" />
                   </div>
 
@@ -256,6 +296,15 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      <Modal
+        isOpen={modalOpen}
+        title={modalTitle}
+        message={modalMessage}
+        onConfirm={modalConfirmAction || (() => {})}
+        onCancel={modalCancelAction}
+        confirmText={modalConfirmText}
+        isDanger={modalDanger}
+      />
     </div>
   );
 }

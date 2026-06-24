@@ -31,6 +31,7 @@ export default function Recorder() {
   const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawLoopRef = useRef<number | null>(null);
+  const workerRef = useRef<Worker | null>(null);
 
   // Refs to avoid stale closures in callbacks
   const durationRef = useRef<number>(0);
@@ -60,6 +61,11 @@ export default function Recorder() {
   const stopAllStreams = () => {
     if (drawLoopRef.current) {
       cancelAnimationFrame(drawLoopRef.current);
+    }
+    if (workerRef.current) {
+      workerRef.current.postMessage({ action: 'stop' });
+      workerRef.current.terminate();
+      workerRef.current = null;
     }
     if (durationTimerRef.current) {
       clearInterval(durationTimerRef.current);
@@ -104,7 +110,12 @@ export default function Recorder() {
 
       // Handle screen sharing cancellation by user (native UI)
       screenStream.getVideoTracks()[0].onended = () => {
-        handleStopRecording(true);
+        const isRecordingActive = mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive';
+        if (isRecordingActive) {
+          handleStopRecording(false); // Stop and Save the active recording
+        } else {
+          handleStopRecording(true);  // Discard and clean up if not recording yet
+        }
       };
 
       // Create hidden video element to render the screen stream
@@ -224,6 +235,13 @@ export default function Recorder() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Clean up any existing worker
+    if (workerRef.current) {
+      workerRef.current.postMessage({ action: 'stop' });
+      workerRef.current.terminate();
+      workerRef.current = null;
+    }
+
     const draw = () => {
       if (!canvas || !ctx) return;
 
@@ -287,12 +305,44 @@ export default function Recorder() {
 
         ctx.restore();
       }
-
-      // Loop drawing
-      drawLoopRef.current = requestAnimationFrame(draw);
     };
 
-    draw();
+    // Create a Web Worker to drive the rendering ticks to bypass background tab throttling of requestAnimationFrame.
+    const workerCode = `
+      let timer = null;
+      self.onmessage = (e) => {
+        if (e.data.action === 'start') {
+          const interval = e.data.interval || 33; // ~30 FPS
+          timer = setInterval(() => {
+            self.postMessage('tick');
+          }, interval);
+        } else if (e.data.action === 'stop') {
+          if (timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+        }
+      };
+    `;
+
+    try {
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      const worker = new Worker(URL.createObjectURL(blob));
+      worker.onmessage = (e) => {
+        if (e.data === 'tick') {
+          draw();
+        }
+      };
+      worker.postMessage({ action: 'start', interval: 33 });
+      workerRef.current = worker;
+    } catch (workerErr) {
+      console.warn('Failed to create Web Worker for compositing, falling back to requestAnimationFrame:', workerErr);
+      const drawLoop = () => {
+        draw();
+        drawLoopRef.current = requestAnimationFrame(drawLoop);
+      };
+      drawLoop();
+    }
   };
 
   // Step 3: Start MediaRecorder
@@ -339,20 +389,21 @@ export default function Recorder() {
       combinedStreamRef.current = combinedStream;
 
       // 4. Initialize MediaRecorder
-      // Choose container options: try MP4 first, then fall back to WebM
-      let mimeType = 'video/mp4;codecs=h264';
-      let extension = 'mp4';
+      // Choose container options: try WebM first (standard and highly stable in all browsers),
+      // then fall back to MP4 if needed (like Safari).
+      let mimeType = 'video/webm;codecs=vp8,opus';
+      let extension = 'webm';
       
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/mp4';
-      }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm;codecs=vp8,opus';
-        extension = 'webm';
-      }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'video/webm';
-        extension = 'webm';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/mp4;codecs=h264,aac';
+        extension = 'mp4';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/mp4';
+        extension = 'mp4';
       }
 
       mimeTypeRef.current = mimeType;

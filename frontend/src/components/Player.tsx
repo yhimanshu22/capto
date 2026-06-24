@@ -5,6 +5,7 @@ import {
   Clock, ArrowLeft, Check, Copy, Film, HardDrive 
 } from 'lucide-react';
 import { Recording } from '../types';
+import Modal from './Modal';
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +15,38 @@ export default function Player() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalConfirmAction, setModalConfirmAction] = useState<(() => void) | null>(null);
+  const [modalCancelAction, setModalCancelAction] = useState<(() => void) | undefined>(undefined);
+  const [modalDanger, setModalDanger] = useState(false);
+  const [modalConfirmText, setModalConfirmText] = useState('Confirm');
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void, isDanger = false) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalConfirmAction(() => () => {
+      onConfirm();
+      setModalOpen(false);
+    });
+    setModalCancelAction(() => () => setModalOpen(false));
+    setModalDanger(isDanger);
+    setModalConfirmText(isDanger ? 'Delete' : 'Confirm');
+    setModalOpen(true);
+  };
+
+  const showAlert = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalConfirmAction(() => () => setModalOpen(false));
+    setModalCancelAction(undefined);
+    setModalDanger(false);
+    setModalConfirmText('OK');
+    setModalOpen(true);
+  };
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -47,24 +80,28 @@ export default function Player() {
     });
   };
 
-  const handleDelete = async () => {
-    if (!recording || !confirm('Are you sure you want to delete this recording?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/recordings/${recording.id}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        navigate('/');
-      } else {
-        alert('Failed to delete recording');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error occurred while deleting recording');
-    }
+  const handleDelete = () => {
+    if (!recording) return;
+    showConfirm(
+      'Delete Recording',
+      'Are you sure you want to delete this recording? This action cannot be undone.',
+      async () => {
+        try {
+          const response = await fetch(`/api/recordings/${recording.id}`, {
+            method: 'DELETE',
+          });
+          if (response.ok) {
+            navigate('/');
+          } else {
+            showAlert('Delete Failed', 'Failed to delete the recording from the server.');
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert('Error', 'An error occurred while attempting to reach the server.');
+        }
+      },
+      true
+    );
   };
 
   const handleSpeedChange = (rate: number) => {
@@ -283,6 +320,15 @@ export default function Player() {
         </div>
 
       </div>
+      <Modal
+        isOpen={modalOpen}
+        title={modalTitle}
+        message={modalMessage}
+        onConfirm={modalConfirmAction || (() => {})}
+        onCancel={modalCancelAction}
+        confirmText={modalConfirmText}
+        isDanger={modalDanger}
+      />
     </div>
   );
 }
