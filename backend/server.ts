@@ -1,8 +1,9 @@
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { Recording } from './types';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,7 +24,7 @@ if (!fs.existsSync(dbPath)) {
 }
 
 // Read database
-function readDB() {
+function readDB(): Recording[] {
   try {
     const data = fs.readFileSync(dbPath, 'utf8');
     return JSON.parse(data);
@@ -34,7 +35,7 @@ function readDB() {
 }
 
 // Write database
-function writeDB(data) {
+function writeDB(data: Recording[]): void {
   try {
     fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
   } catch (err) {
@@ -71,7 +72,7 @@ const upload = multer({
 });
 
 // Upload endpoint
-app.post('/api/upload', upload.single('video'), (req, res) => {
+app.post('/api/upload', upload.single('video'), (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file uploaded' });
@@ -80,7 +81,7 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
     const { title, duration } = req.body;
     const db = readDB();
 
-    const newRecording = {
+    const newRecording: Recording = {
       id: path.basename(req.file.filename, path.extname(req.file.filename)),
       title: title || 'Untitled Recording',
       duration: parseFloat(duration) || 0,
@@ -100,11 +101,11 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
 });
 
 // List all recordings
-app.get('/api/recordings', (req, res) => {
+app.get('/api/recordings', (req: Request, res: Response) => {
   try {
     const db = readDB();
     // Return sorted by date descending (latest first)
-    const sorted = db.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const sorted = db.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     res.json(sorted);
   } catch (err) {
     console.error('Get recordings error:', err);
@@ -113,7 +114,7 @@ app.get('/api/recordings', (req, res) => {
 });
 
 // Get a single recording
-app.get('/api/recordings/:id', (req, res) => {
+app.get('/api/recordings/:id', (req: Request, res: Response) => {
   try {
     const db = readDB();
     const recording = db.find(r => r.id === req.params.id);
@@ -128,7 +129,7 @@ app.get('/api/recordings/:id', (req, res) => {
 });
 
 // Delete a recording
-app.delete('/api/recordings/:id', (req, res) => {
+app.delete('/api/recordings/:id', (req: Request, res: Response) => {
   try {
     const db = readDB();
     const index = db.findIndex(r => r.id === req.params.id);
@@ -158,4 +159,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = app;
+export default app;

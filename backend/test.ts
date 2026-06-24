@@ -1,16 +1,18 @@
-const test = require('node:test');
-const assert = require('node:assert');
-const app = require('./server');
+import test from 'node:test';
+import assert from 'node:assert';
+import app from './server';
+import { AddressInfo } from 'net';
 
 test('Capto Backend API Integration Tests', async (t) => {
-  let server;
-  let port;
-  let baseUrl;
+  let server: any;
+  let port: number;
+  let baseUrl: string;
 
   // Setup: Start server on an ephemeral port before running tests
-  await new Promise((resolve) => {
+  await new Promise<void>((resolve) => {
     server = app.listen(0, () => {
-      port = server.address().port;
+      const address = server.address() as AddressInfo;
+      port = address.port;
       baseUrl = `http://localhost:${port}`;
       resolve();
     });
@@ -31,7 +33,7 @@ test('Capto Backend API Integration Tests', async (t) => {
   await t.test('GET /api/recordings/:id with unknown ID returns 404', async () => {
     const res = await fetch(`${baseUrl}/api/recordings/unknown-id-12345`);
     assert.strictEqual(res.status, 404);
-    const data = await res.json();
+    const data: any = await res.json();
     assert.strictEqual(data.error, 'Recording not found');
   });
 
@@ -42,7 +44,7 @@ test('Capto Backend API Integration Tests', async (t) => {
       headers: { 'Content-Type': 'application/json' }
     });
     assert.strictEqual(res.status, 400);
-    const data = await res.json();
+    const data: any = await res.json();
     assert.strictEqual(data.error, 'No video file uploaded');
   });
 
@@ -51,7 +53,7 @@ test('Capto Backend API Integration Tests', async (t) => {
       method: 'DELETE'
     });
     assert.strictEqual(res.status, 404);
-    const data = await res.json();
+    const data: any = await res.json();
     assert.strictEqual(data.error, 'Recording not found');
   });
 });
