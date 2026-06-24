@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Video, PlusCircle, FolderHeart } from 'lucide-react';
+import { PlusCircle, FolderHeart } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
 
       <header className="sticky top-0 z-50 flex items-center justify-between border-b border-slate-100 bg-white/80 px-6 py-4 backdrop-blur-md shadow-sm">
         <Link to="/" className="flex items-center gap-2 font-display text-2xl font-extrabold tracking-tight text-slate-900 hover:opacity-90 transition-all">
-          <Video size={28} className="text-violet-600" />
+          <img src="/logo.png" alt="Capto Logo" className="w-8 h-8 object-contain" />
           <span>Capto</span>
         </Link>
         <div className="flex items-center gap-3">
