@@ -22,7 +22,7 @@ export default function Layout({ children }: LayoutProps) {
         </Link>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => navigate('/')} 
+            onClick={() => navigate('/library')} 
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
           >
             <FolderHeart size={16} className="text-slate-500" />

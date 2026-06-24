@@ -92,7 +92,7 @@ export default function Player() {
             method: 'DELETE',
           });
           if (response.ok) {
-            navigate('/');
+            navigate('/library');
           } else {
             showAlert('Delete Failed', 'Failed to delete the recording from the server.');
           }
@@ -156,7 +156,7 @@ export default function Player() {
           <h2 className="text-xl font-bold text-slate-800 mb-2">Video Unavailable</h2>
           <p className="text-sm text-slate-500 mb-6">{error}</p>
           <button 
-            onClick={() => navigate('/')} 
+            onClick={() => navigate('/library')} 
             className="px-5 py-2.5 font-semibold text-white bg-violet-600 rounded-xl hover:bg-violet-700 hover:shadow-md hover:shadow-violet-100 active:scale-[0.98] transition-all cursor-pointer"
           >
             Return to Library
@@ -174,7 +174,7 @@ export default function Player() {
       {/* Top action header */}
       <div className="flex items-center justify-between">
         <button 
-          onClick={() => navigate('/')} 
+          onClick={() => navigate('/library')} 
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
         >
           <ArrowLeft size={16} />
