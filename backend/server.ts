@@ -15,6 +15,7 @@ function transcodeToMp4(inputPath: string, outputPath: string): Promise<void> {
       .output(outputPath)
       .videoCodec('libx264')
       .audioCodec('aac')
+      .audioFilters('highpass=f=80, afftdn')
       .outputOptions([
         '-crf 20',
         '-preset fast',
