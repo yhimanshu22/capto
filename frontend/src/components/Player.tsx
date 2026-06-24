@@ -226,6 +226,16 @@ export default function Player() {
               autoPlay
               playsInline
               className="w-full h-full block"
+              onPlay={() => {
+                if (videoRef.current) {
+                  videoRef.current.playbackRate = playbackRate;
+                }
+              }}
+              onLoadedMetadata={() => {
+                if (videoRef.current) {
+                  videoRef.current.playbackRate = playbackRate;
+                }
+              }}
             />
           </div>
 
