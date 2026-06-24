@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Recording } from '../types';
 import Modal from './Modal';
+import { API_BASE } from '../config';
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
@@ -58,7 +59,7 @@ export default function Player() {
   const fetchRecordingDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/recordings/${id}`);
+      const response = await fetch(`${API_BASE}/api/recordings/${id}`);
       if (!response.ok) {
         throw new Error('Recording not found');
       }
@@ -88,7 +89,7 @@ export default function Player() {
       'Are you sure you want to delete this recording? This action cannot be undone.',
       async () => {
         try {
-          const response = await fetch(`/api/recordings/${recording.id}`, {
+          const response = await fetch(`${API_BASE}/api/recordings/${recording.id}`, {
             method: 'DELETE',
           });
           if (response.ok) {
@@ -166,7 +167,7 @@ export default function Player() {
     );
   }
 
-  const videoUrl = `/videos/${recording.fileName}`;
+  const videoUrl = `${API_BASE}/videos/${recording.fileName}`;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 w-full flex-1 flex flex-col gap-6 animate-[fadeIn_0.4s_ease-out]">

@@ -4,18 +4,19 @@ import {
   Video, Sparkles, ArrowRight, 
   Volume2, Share2, PlayCircle, Layers
 } from 'lucide-react';
+import { API_BASE } from '../config';
 
 export default function Landing() {
   const navigate = useNavigate();
   const [demoVideoUrl, setDemoVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/recordings')
+    fetch(`${API_BASE}/api/recordings`)
       .then(res => res.json())
       .then(data => {
         if (data && data.length > 0) {
           // Use the latest recording as the hosted video demo
-          setDemoVideoUrl(`/videos/${data[0].fileName}`);
+          setDemoVideoUrl(`${API_BASE}/videos/${data[0].fileName}`);
         } else {
           // Fallback to a high-quality tech preview video
           setDemoVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');

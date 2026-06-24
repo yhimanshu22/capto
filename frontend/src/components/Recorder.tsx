@@ -4,6 +4,7 @@ import {
   Camera, CameraOff, Mic, MicOff, StopCircle, Play, 
   Video, AlertTriangle, ArrowLeft, Loader2, Sparkles 
 } from 'lucide-react';
+import { API_BASE } from '../config';
 
 export default function Recorder() {
   const navigate = useNavigate();
@@ -498,7 +499,7 @@ export default function Recorder() {
       formData.append('title', titleRef.current.trim() || 'Capto Recording');
       formData.append('duration', durationRef.current.toString());
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         body: formData,
       });

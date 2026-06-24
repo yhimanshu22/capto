@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Recording } from '../types';
 import Modal from './Modal';
+import { API_BASE } from '../config';
 
 export default function Dashboard() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
@@ -54,7 +55,7 @@ export default function Dashboard() {
   const fetchRecordings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/recordings');
+      const response = await fetch(`${API_BASE}/api/recordings`);
       if (!response.ok) {
         throw new Error('Failed to load recordings');
       }
@@ -76,7 +77,7 @@ export default function Dashboard() {
       'Are you sure you want to delete this recording? This action cannot be undone.',
       async () => {
         try {
-          const response = await fetch(`/api/recordings/${id}`, {
+          const response = await fetch(`${API_BASE}/api/recordings/${id}`, {
             method: 'DELETE',
           });
           if (response.ok) {
@@ -228,7 +229,7 @@ export default function Dashboard() {
                 {/* Visual Video Card Preview */}
                 <div className="h-40 bg-slate-950 flex items-center justify-center relative overflow-hidden border-b border-slate-100">
                   <video 
-                    src={`/videos/${rec.fileName}#t=0.1`} 
+                    src={`${API_BASE}/videos/${rec.fileName}#t=0.1`} 
                     preload="metadata" 
                     muted 
                     playsInline 
