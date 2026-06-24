@@ -114,13 +114,57 @@ export default function Recorder() {
       // 2. Get Camera & Mic stream
       if (cameraEnabled || micEnabled) {
         try {
+          let videoConstraint: any = cameraEnabled ? {
+            width: { ideal: 320 },
+            height: { ideal: 320 },
+            frameRate: { ideal: 30 }
+          } : false;
+
+          let audioConstraint: any = micEnabled;
+
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            
+            const isVirtualOrPhone = (label: string) => {
+              const l = label.toLowerCase();
+              return (
+                l.includes('droidcam') ||
+                l.includes('iriun') ||
+                l.includes('womic') ||
+                l.includes('redmi') ||
+                l.includes('virtual') ||
+                l.includes('obs camera') ||
+                l.includes('obs-camera') ||
+                l.includes('phone')
+              );
+            };
+
+            if (cameraEnabled) {
+              const videoDevices = devices.filter(d => d.kind === 'videoinput');
+              const realVideoDevice = videoDevices.find(d => d.label && !isVirtualOrPhone(d.label));
+              if (realVideoDevice) {
+                videoConstraint = {
+                  ...videoConstraint,
+                  deviceId: { ideal: realVideoDevice.deviceId }
+                };
+              }
+            }
+
+            if (micEnabled) {
+              const audioDevices = devices.filter(d => d.kind === 'audioinput');
+              const realAudioDevice = audioDevices.find(d => d.label && !isVirtualOrPhone(d.label));
+              if (realAudioDevice) {
+                audioConstraint = typeof audioConstraint === 'boolean' ? {} : audioConstraint;
+                audioConstraint.deviceId = { ideal: realAudioDevice.deviceId };
+              }
+            }
+          } catch (deviceErr) {
+            console.warn('Error filtering input devices:', deviceErr);
+          }
+
           const cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: cameraEnabled ? {
-              width: { ideal: 320 },
-              height: { ideal: 320 },
-              frameRate: { ideal: 30 }
-            } : false,
-            audio: micEnabled
+            video: videoConstraint,
+            audio: audioConstraint
           });
           cameraStreamRef.current = cameraStream;
 
