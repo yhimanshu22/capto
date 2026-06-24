@@ -10,22 +10,30 @@ import { Recording } from './types';
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 function transcodeToMp4(inputPath: string, outputPath: string): Promise<void> {
+  console.log(`[Transcoder] Starting transcoding of ${path.basename(inputPath)} to MP4...`);
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .output(outputPath)
       .videoCodec('libx264')
       .audioCodec('aac')
-      .audioFilters('highpass=f=80, afftdn')
+      .audioFilters('highpass=f=100, lowpass=f=10000, afftdn=nr=24')
       .outputOptions([
         '-crf 20',
         '-preset fast',
         '-b:a 128k',
         '-movflags +faststart'
       ])
+      .on('progress', (progress) => {
+        if (progress.percent) {
+          console.log(`[Transcoder] Transcoding progress: ${Math.round(progress.percent)}%`);
+        }
+      })
       .on('end', () => {
+        console.log(`[Transcoder] Successfully transcoded to ${path.basename(outputPath)}`);
         resolve();
       })
       .on('error', (err) => {
+        console.error(`[Transcoder] Transcoding failed:`, err);
         reject(err);
       })
       .run();
@@ -34,6 +42,16 @@ function transcodeToMp4(inputPath: string, outputPath: string): Promise<void> {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Custom Request Logging Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
 
 // Enable CORS so frontend can communicate with backend
 app.use(cors());
