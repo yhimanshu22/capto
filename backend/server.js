@@ -143,6 +143,10 @@ app.delete('/api/recordings/:id', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Capto backend listening on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Capto backend listening on port ${PORT}`);
+  });
+}
+
+module.exports = app;
