@@ -160,7 +160,7 @@ export default function Player() {
           </button>
           <a 
             href={videoUrl} 
-            download={recording.title + '.webm'} 
+            download={recording.title + '.' + (recording.fileName.split('.').pop() || 'webm')} 
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
           >
             <Download size={16} />

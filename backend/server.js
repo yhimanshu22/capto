@@ -52,7 +52,16 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'recording-' + uniqueSuffix + '.webm');
+    let ext = '.webm';
+    if (file.mimetype === 'video/mp4') {
+      ext = '.mp4';
+    } else if (file.originalname) {
+      const parsedExt = path.extname(file.originalname);
+      if (parsedExt) {
+        ext = parsedExt;
+      }
+    }
+    cb(null, 'recording-' + uniqueSuffix + ext);
   }
 });
 
@@ -72,7 +81,7 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
     const db = readDB();
 
     const newRecording = {
-      id: path.basename(req.file.filename, '.webm'),
+      id: path.basename(req.file.filename, path.extname(req.file.filename)),
       title: title || 'Untitled Recording',
       duration: parseFloat(duration) || 0,
       createdAt: new Date().toISOString(),

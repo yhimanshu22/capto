@@ -32,6 +32,15 @@ export default function Recorder() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawLoopRef = useRef<number | null>(null);
 
+  // Refs to avoid stale closures in callbacks
+  const durationRef = useRef<number>(0);
+  const titleRef = useRef<string>('');
+  const mimeTypeRef = useRef<string>('video/webm;codecs=vp8,opus');
+  const extensionRef = useRef<string>('webm');
+
+  // Track title changes in real-time
+  titleRef.current = title;
+
   useEffect(() => {
     // Default title
     const dateStr = new Date().toLocaleDateString(undefined, { 
@@ -120,7 +129,11 @@ export default function Recorder() {
             frameRate: { ideal: 30 }
           } : false;
 
-          let audioConstraint: any = micEnabled;
+          let audioConstraint: any = micEnabled ? {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } : false;
 
           try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -153,8 +166,13 @@ export default function Recorder() {
             if (micEnabled) {
               const audioDevices = devices.filter(d => d.kind === 'audioinput');
               const realAudioDevice = audioDevices.find(d => d.label && !isVirtualOrPhone(d.label));
+              
+              audioConstraint = {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              };
               if (realAudioDevice) {
-                audioConstraint = typeof audioConstraint === 'boolean' ? {} : audioConstraint;
                 audioConstraint.deviceId = { ideal: realAudioDevice.deviceId };
               }
             }
@@ -321,13 +339,26 @@ export default function Recorder() {
       combinedStreamRef.current = combinedStream;
 
       // 4. Initialize MediaRecorder
-      // Choose container options
-      let options = { mimeType: 'video/webm;codecs=vp8,opus' };
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/webm' };
+      // Choose container options: try MP4 first, then fall back to WebM
+      let mimeType = 'video/mp4;codecs=h264';
+      let extension = 'mp4';
+      
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/mp4';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm;codecs=vp8,opus';
+        extension = 'webm';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+        extension = 'webm';
       }
 
-      const recorder = new MediaRecorder(combinedStream, options);
+      mimeTypeRef.current = mimeType;
+      extensionRef.current = extension;
+
+      const recorder = new MediaRecorder(combinedStream, { mimeType });
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
@@ -344,11 +375,15 @@ export default function Recorder() {
       recorder.start(1000); // chunk size 1s
       setIsRecording(true);
       setIsPaused(false);
+      
+      // Reset duration ref and state
+      durationRef.current = 0;
       setRecordDuration(0);
 
-      // Duration counter
+      // Duration counter (updates ref for uploads, and state for UI)
       durationTimerRef.current = window.setInterval(() => {
-        setRecordDuration(prev => prev + 1);
+        durationRef.current += 1;
+        setRecordDuration(durationRef.current);
       }, 1000);
 
     } catch (err: any) {
@@ -365,7 +400,8 @@ export default function Recorder() {
       recorder.resume();
       setIsPaused(false);
       durationTimerRef.current = window.setInterval(() => {
-        setRecordDuration(prev => prev + 1);
+        durationRef.current += 1;
+        setRecordDuration(durationRef.current);
       }, 1000);
     } else {
       recorder.pause();
@@ -404,12 +440,12 @@ export default function Recorder() {
         throw new Error('No recorded data found');
       }
 
-      const videoBlob = new Blob(chunks, { type: 'video/webm' });
+      const videoBlob = new Blob(chunks, { type: mimeTypeRef.current });
       
       const formData = new FormData();
-      formData.append('video', videoBlob);
-      formData.append('title', title.trim() || 'Capto Recording');
-      formData.append('duration', recordDuration.toString());
+      formData.append('video', videoBlob, `recording.${extensionRef.current}`);
+      formData.append('title', titleRef.current.trim() || 'Capto Recording');
+      formData.append('duration', durationRef.current.toString());
 
       const response = await fetch('/api/upload', {
         method: 'POST',
