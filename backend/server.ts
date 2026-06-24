@@ -3,7 +3,27 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffmpeg from 'fluent-ffmpeg';
 import { Recording } from './types';
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+function transcodeToMp4(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .output(outputPath)
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .on('end', () => {
+        resolve();
+      })
+      .on('error', (err) => {
+        reject(err);
+      })
+      .run();
+  });
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -72,7 +92,7 @@ const upload = multer({
 });
 
 // Upload endpoint
-app.post('/api/upload', upload.single('video'), (req: Request, res: Response) => {
+app.post('/api/upload', upload.single('video'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file uploaded' });
@@ -80,14 +100,36 @@ app.post('/api/upload', upload.single('video'), (req: Request, res: Response) =>
 
     const { title, duration } = req.body;
     const db = readDB();
+    
+    let finalFileName = req.file.filename;
+    let finalSize = req.file.size;
+
+    // Check if the file needs transcoding to MP4
+    if (path.extname(req.file.filename).toLowerCase() !== '.mp4') {
+      const mp4FileName = req.file.filename.replace(path.extname(req.file.filename), '.mp4');
+      const mp4Path = path.join(uploadsDir, mp4FileName);
+      
+      try {
+        await transcodeToMp4(req.file.path, mp4Path);
+        // Clean up the original uploaded file (e.g. WebM)
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        finalFileName = mp4FileName;
+        finalSize = fs.statSync(mp4Path).size;
+      } catch (transcodeErr) {
+        console.error('Transcoding to MP4 failed, falling back to original file:', transcodeErr);
+        // Keep the original uploaded file parameters
+      }
+    }
 
     const newRecording: Recording = {
-      id: path.basename(req.file.filename, path.extname(req.file.filename)),
+      id: path.basename(finalFileName, path.extname(finalFileName)),
       title: title || 'Untitled Recording',
       duration: parseFloat(duration) || 0,
       createdAt: new Date().toISOString(),
-      fileName: req.file.filename,
-      size: req.file.size
+      fileName: finalFileName,
+      size: finalSize
     };
 
     db.push(newRecording);
