@@ -12,7 +12,7 @@ export default function Landing() {
       
       {/* Hero Section */}
       <section className="relative px-6 py-20 md:py-28 max-w-7xl mx-auto w-full text-center flex flex-col items-center gap-6 z-10">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-violet-750 bg-violet-50 border border-violet-100/50 animate-bounce">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-violet-700 bg-violet-50 border border-violet-100/50 animate-bounce">
           <Sparkles size={12} />
           <span>Loom Alternative for Teams</span>
         </div>
@@ -160,7 +160,7 @@ export default function Landing() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
           {/* Step 1 */}
           <div className="flex flex-col gap-3 text-center items-center">
-            <span className="w-10 h-10 rounded-full bg-violet-650 text-white flex items-center justify-center font-bold text-sm shadow-md">1</span>
+            <span className="w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm shadow-md">1</span>
             <h4 className="text-base font-bold text-slate-800 mt-2">Configure Media</h4>
             <p className="text-xs text-slate-500 max-w-xs leading-relaxed font-medium">
               Grant standard screen capture and webcam permissions to link your recording tracks.
@@ -169,7 +169,7 @@ export default function Landing() {
 
           {/* Step 2 */}
           <div className="flex flex-col gap-3 text-center items-center">
-            <span className="w-10 h-10 rounded-full bg-violet-650 text-white flex items-center justify-center font-bold text-sm shadow-md">2</span>
+            <span className="w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm shadow-md">2</span>
             <h4 className="text-base font-bold text-slate-800 mt-2">Capture Studio</h4>
             <p className="text-xs text-slate-500 max-w-xs leading-relaxed font-medium">
               Record your screen, voice, and camera overlay. Background timers ensure consistent framing.
@@ -178,7 +178,7 @@ export default function Landing() {
 
           {/* Step 3 */}
           <div className="flex flex-col gap-3 text-center items-center">
-            <span className="w-10 h-10 rounded-full bg-violet-650 text-white flex items-center justify-center font-bold text-sm shadow-md">3</span>
+            <span className="w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm shadow-md">3</span>
             <h4 className="text-base font-bold text-slate-800 mt-2">Instant URL</h4>
             <p className="text-xs text-slate-500 max-w-xs leading-relaxed font-medium">
               Stop sharing to automatically transcode and generate a watch link. Copy, share, and review.
@@ -189,7 +189,7 @@ export default function Landing() {
 
       {/* CTA Footer Section */}
       <section className="px-6 pb-20 max-w-5xl mx-auto w-full z-10">
-        <div className="bg-gradient-to-tr from-violet-600 to-indigo-850 rounded-3xl p-8 md:p-12 text-center text-white shadow-xl flex flex-col items-center gap-5 relative overflow-hidden">
+        <div className="bg-gradient-to-tr from-violet-600 to-indigo-900 rounded-3xl p-8 md:p-12 text-center text-white shadow-xl flex flex-col items-center gap-5 relative overflow-hidden">
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff15_1px,transparent_1px),linear-gradient(to_bottom,#ffffff15_1px,transparent_1px)] bg-[size:2rem_2rem] opacity-20"></div>
           <h3 className="text-2xl md:text-4xl font-extrabold tracking-tight font-display z-10">Ready to capture your screen?</h3>
           <p className="text-xs md:text-sm text-violet-100 max-w-md z-10 leading-relaxed font-medium">
@@ -197,7 +197,7 @@ export default function Landing() {
           </p>
           <button 
             onClick={() => navigate('/record')} 
-            className="mt-2 px-8 py-4 bg-white text-violet-750 font-bold rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-base shadow-lg z-10 flex items-center gap-1.5"
+            className="mt-2 px-8 py-4 bg-white text-violet-700 font-bold rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-base shadow-lg z-10 flex items-center gap-1.5"
           >
             <span>Record My First Video</span>
             <ArrowRight size={18} />
