@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Video, Sparkles, ArrowRight, 
@@ -6,7 +7,24 @@ import {
 
 export default function Landing() {
   const navigate = useNavigate();
-  const demoVideoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+  const [demoVideoUrl, setDemoVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/recordings')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          // Use the latest recording as the hosted video demo
+          setDemoVideoUrl(`/videos/${data[0].fileName}`);
+        } else {
+          // Fallback to a high-quality tech preview video
+          setDemoVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+        }
+      })
+      .catch(() => {
+        setDemoVideoUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+      });
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 text-slate-800 relative overflow-hidden">
@@ -67,7 +85,6 @@ export default function Landing() {
             {demoVideoUrl ? (
               <video 
                 src={demoVideoUrl}
-                controls
                 autoPlay
                 loop
                 muted
@@ -78,19 +95,6 @@ export default function Landing() {
               <div className="w-10 h-10 border-4 border-slate-800 border-t-violet-600 rounded-full animate-spin"></div>
             )}
 
-            {/* Floating Camera Bubble (overlays the video to demonstrate screen + camera concept) */}
-            <div className="absolute bottom-6 left-6 w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-violet-600 bg-slate-800 shadow-2xl flex items-center justify-center overflow-hidden animate-[pulse_3s_infinite] z-20 pointer-events-none">
-              <div className="w-full h-full bg-gradient-to-tr from-violet-600 to-indigo-700 flex flex-col items-center justify-center text-white">
-                <span className="text-sm font-extrabold tracking-wider uppercase font-display">YOU</span>
-                <span className="text-[7px] font-bold text-violet-200 mt-0.5 tracking-widest uppercase">Webcam</span>
-              </div>
-            </div>
-
-            {/* Floating Recording indicator */}
-            <div className="absolute top-6 left-6 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-bold text-white flex items-center gap-1.5 shadow-lg z-20 pointer-events-none">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block"></span>
-              <span>DEMO PLAY</span>
-            </div>
           </div>
         </div>
       </section>
