@@ -40,12 +40,12 @@ app.use(cors());
 app.use(express.json());
 
 // Ensure directories exist
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const dbPath = path.join(__dirname, 'recordings.json');
+const dbPath = path.join(process.cwd(), 'recordings.json');
 if (!fs.existsSync(dbPath)) {
   fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
 }
