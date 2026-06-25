@@ -5,9 +5,11 @@ import {
   Volume2, Share2, PlayCircle, Layers
 } from 'lucide-react';
 import { API_BASE } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [demoVideoUrl, setDemoVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,13 +57,15 @@ export default function Landing() {
             <span>Start Recording Free</span>
             <ArrowRight size={18} />
           </button>
-          <button 
-            onClick={() => navigate('/library')} 
-            className="px-8 py-4 font-bold text-slate-700 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-base shadow-sm"
-          >
-            <PlayCircle size={20} className="text-slate-500" />
-            <span>Browse Library</span>
-          </button>
+          {isAuthenticated && (
+            <button 
+              onClick={() => navigate('/library')} 
+              className="px-8 py-4 font-bold text-slate-700 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-base shadow-sm"
+            >
+              <PlayCircle size={20} className="text-slate-500" />
+              <span>Browse Library</span>
+            </button>
+          )}
         </div>
       </section>
 

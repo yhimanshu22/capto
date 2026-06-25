@@ -1,9 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import app from './server';
+import mongoose from 'mongoose';
 import { AddressInfo } from 'net';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 
-test('Capto Backend API Integration Tests', async (t) => {
+test('Capto Backend API Integration Tests with MongoDB', async (t) => {
+  // Start in-memory MongoDB instance and set URI before app is imported
+  const mongoServer = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = mongoServer.getUri();
+
+  // Dynamically import app and models so they use the new MONGODB_URI
+  const app = (await import('./server')).default;
+  const User = (await import('./models/User')).default;
+  const Recording = (await import('./models/Recording')).default;
+
   let server: any;
   let port: number;
   let baseUrl: string;
@@ -11,7 +21,7 @@ test('Capto Backend API Integration Tests', async (t) => {
 
   // Setup: Start server on an ephemeral port before running tests
   await new Promise<void>((resolve) => {
-    server = app.listen(0, () => {
+    server = app.listen(0, async () => {
       const address = server.address() as AddressInfo;
       port = address.port;
       baseUrl = `http://localhost:${port}`;
@@ -19,8 +29,17 @@ test('Capto Backend API Integration Tests', async (t) => {
     });
   });
 
-  // Teardown: Close the server when tests finish
-  t.after(() => {
+  // Ensure connection is established
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(process.env.MONGODB_URI as string);
+  }
+
+  // Teardown: Close the server and disconnect DB when tests finish
+  t.after(async () => {
+    await mongoose.connection.close();
+    if (mongoServer) {
+      await mongoServer.stop();
+    }
     server.close();
   });
 
@@ -68,7 +87,9 @@ test('Capto Backend API Integration Tests', async (t) => {
   });
 
   await t.test('GET /api/recordings/:id with unknown ID returns 404', async () => {
-    const res = await fetch(`${baseUrl}/api/recordings/unknown-id-12345`);
+    // Generate a valid ObjectId to test 404
+    const fakeObjectId = new mongoose.Types.ObjectId().toHexString();
+    const res = await fetch(`${baseUrl}/api/recordings/${fakeObjectId}`);
     assert.strictEqual(res.status, 404);
     const data: any = await res.json();
     assert.strictEqual(data.error, 'Recording not found');
@@ -98,7 +119,8 @@ test('Capto Backend API Integration Tests', async (t) => {
   });
 
   await t.test('DELETE /api/recordings/:id with unknown ID returns 404', async () => {
-    const res = await fetch(`${baseUrl}/api/recordings/unknown-id-12345`, {
+    const fakeObjectId = new mongoose.Types.ObjectId().toHexString();
+    const res = await fetch(`${baseUrl}/api/recordings/${fakeObjectId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });

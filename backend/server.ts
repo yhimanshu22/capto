@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -7,7 +10,10 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffmpeg from 'fluent-ffmpeg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { Recording, User, AuthenticatedRequest } from './types';
+import mongoose from 'mongoose';
+import { AuthenticatedRequest } from './types';
+import User from './models/User';
+import Recording from './models/Recording';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -44,6 +50,16 @@ function transcodeToMp4(inputPath: string, outputPath: string): Promise<void> {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/capto';
+
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI)
+  .then(() => {
+    // Redact password from the URI before logging
+    const redactedURI = MONGODB_URI.replace(/:([^:@]+)@/, ':***@');
+    console.log(`Connected to MongoDB at ${redactedURI}`);
+  })
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Custom Request Logging Middleware
 app.use((req, res, next) => {
@@ -65,56 +81,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'capto-fallback-secret-key-12345';
 const uploadsDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'recordings.json');
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
-}
-
-const usersDbPath = process.env.USERS_DB_PATH || path.join(process.cwd(), 'users.json');
-if (!fs.existsSync(usersDbPath)) {
-  fs.writeFileSync(usersDbPath, JSON.stringify([], null, 2));
-}
-
-// Read database
-function readDB(): Recording[] {
-  try {
-    const data = fs.readFileSync(dbPath, 'utf8');
-    return JSON.parse(data);
-  } catch (err) {
-    console.error('Error reading DB, resetting database:', err);
-    return [];
-  }
-}
-
-// Write database
-function writeDB(data: Recording[]): void {
-  try {
-    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error('Error writing DB:', err);
-  }
-}
-
-// Read Users database
-function readUsersDB(): User[] {
-  try {
-    const data = fs.readFileSync(usersDbPath, 'utf8');
-    return JSON.parse(data);
-  } catch (err) {
-    console.error('Error reading Users DB, resetting:', err);
-    return [];
-  }
-}
-
-// Write Users database
-function writeUsersDB(data: User[]): void {
-  try {
-    fs.writeFileSync(usersDbPath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error('Error writing Users DB:', err);
-  }
 }
 
 // Authentication Middleware
@@ -177,28 +143,24 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters long' });
     }
 
-    const users = readUsersDB();
     const normalizedEmail = email.toLowerCase().trim();
-    if (users.some(u => u.email === normalizedEmail)) {
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    
+    if (existingUser) {
       return res.status(400).json({ error: 'Email is already registered' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const newUser: User = {
-      id: 'user-' + Date.now() + '-' + Math.round(Math.random() * 1e9),
+    const newUser = await User.create({
       email: normalizedEmail,
-      passwordHash,
-      createdAt: new Date().toISOString()
-    };
+      passwordHash
+    });
 
-    users.push(newUser);
-    writeUsersDB(users);
-
-    const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: newUser._id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({
       token,
       user: {
-        id: newUser.id,
+        id: newUser._id,
         email: newUser.email
       }
     });
@@ -215,9 +177,8 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const users = readUsersDB();
     const normalizedEmail = email.toLowerCase().trim();
-    const user = users.find(u => u.email === normalizedEmail);
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -228,11 +189,11 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
     res.json({
       token,
       user: {
-        id: user.id,
+        id: user._id,
         email: user.email
       }
     });
@@ -254,8 +215,6 @@ app.post('/api/upload', authenticateToken, upload.single('video'), async (req: A
     }
 
     const { title, duration } = req.body;
-    const db = readDB();
-    
     let finalFileName = req.file.filename;
     let finalSize = req.file.size;
 
@@ -266,7 +225,6 @@ app.post('/api/upload', authenticateToken, upload.single('video'), async (req: A
       
       try {
         await transcodeToMp4(req.file.path, mp4Path);
-        // Clean up the original uploaded file (e.g. WebM)
         if (fs.existsSync(req.file.path)) {
           fs.unlinkSync(req.file.path);
         }
@@ -274,22 +232,16 @@ app.post('/api/upload', authenticateToken, upload.single('video'), async (req: A
         finalSize = fs.statSync(mp4Path).size;
       } catch (transcodeErr) {
         console.error('Transcoding to MP4 failed, falling back to original file:', transcodeErr);
-        // Keep the original uploaded file parameters
       }
     }
 
-    const newRecording: Recording = {
-      id: path.basename(finalFileName, path.extname(finalFileName)),
+    const newRecording = await Recording.create({
       title: title || 'Untitled Recording',
       duration: parseFloat(duration) || 0,
-      createdAt: new Date().toISOString(),
       fileName: finalFileName,
       size: finalSize,
       userId: req.user?.id
-    };
-
-    db.push(newRecording);
-    writeDB(db);
+    });
 
     res.status(201).json(newRecording);
   } catch (err) {
@@ -299,14 +251,10 @@ app.post('/api/upload', authenticateToken, upload.single('video'), async (req: A
 });
 
 // List all recordings
-app.get('/api/recordings', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+app.get('/api/recordings', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const db = readDB();
-    // Only return recordings belonging to the current user
-    const userRecordings = db.filter(r => r.userId === req.user?.id);
-    // Return sorted by date descending (latest first)
-    const sorted = userRecordings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    res.json(sorted);
+    const userRecordings = await Recording.find({ userId: req.user?.id }).sort({ createdAt: -1 });
+    res.json(userRecordings);
   } catch (err) {
     console.error('Get recordings error:', err);
     res.status(500).json({ error: 'Failed to fetch recordings' });
@@ -314,39 +262,37 @@ app.get('/api/recordings', authenticateToken, (req: AuthenticatedRequest, res: R
 });
 
 // Get a single recording
-app.get('/api/recordings/:id', (req: Request, res: Response) => {
+app.get('/api/recordings/:id', async (req: Request, res: Response) => {
   try {
-    const db = readDB();
-    const recording = db.find(r => r.id === req.params.id);
+    const recording = await Recording.findById(req.params.id);
     if (!recording) {
       return res.status(404).json({ error: 'Recording not found' });
     }
     res.json(recording);
   } catch (err) {
     console.error('Get recording details error:', err);
-    res.status(500).json({ error: 'Failed to fetch recording details' });
+    // If it's an invalid ObjectId format, mongoose will throw CastError, we should treat it as 404
+    res.status(404).json({ error: 'Recording not found' });
   }
 });
 
 // Delete a recording
-app.delete('/api/recordings/:id', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+app.delete('/api/recordings/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const db = readDB();
-    const index = db.findIndex(r => r.id === req.params.id);
-    if (index === -1) {
+    const recording = await Recording.findById(req.params.id);
+    
+    if (!recording) {
       return res.status(404).json({ error: 'Recording not found' });
     }
 
-    const recording = db[index];
     if (recording.userId && recording.userId !== req.user?.id) {
       return res.status(403).json({ error: 'You are not authorized to delete this recording' });
     }
 
-    const [deleted] = db.splice(index, 1);
-    writeDB(db);
+    await Recording.findByIdAndDelete(req.params.id);
 
     // Delete file from disk
-    const filePath = path.join(uploadsDir, deleted.fileName);
+    const filePath = path.join(uploadsDir, recording.fileName);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }

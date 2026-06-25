@@ -23,13 +23,15 @@ export default function Layout({ children }: LayoutProps) {
           <span>Capto</span>
         </Link>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => navigate('/library')} 
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
-          >
-            <FolderHeart size={16} className="text-slate-500" />
-            <span>My Library</span>
-          </button>
+          {isAuthenticated && (
+            <button 
+              onClick={() => navigate('/library')} 
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <FolderHeart size={16} className="text-slate-500" />
+              <span>My Library</span>
+            </button>
+          )}
           <button 
             onClick={() => navigate('/record')} 
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-violet-600 rounded-xl hover:bg-violet-700 hover:shadow-md hover:shadow-violet-100 active:scale-[0.98] transition-all cursor-pointer"

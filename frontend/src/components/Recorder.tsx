@@ -336,7 +336,7 @@ export default function Recorder() {
           draw();
         }
       };
-      worker.postMessage({ action: 'start', interval: 33 });
+      worker.postMessage({ action: 'start', interval: 16 });
       workerRef.current = worker;
     } catch (workerErr) {
       console.warn('Failed to create Web Worker for compositing, falling back to requestAnimationFrame:', workerErr);
@@ -358,8 +358,8 @@ export default function Recorder() {
 
       recordedChunksRef.current = [];
 
-      // 1. Capture stream from compositing Canvas
-      const canvasStream = (canvas as any).captureStream ? (canvas as any).captureStream(30) : (canvas as any).mozCaptureStream(30);
+      // 1. Capture stream from compositing Canvas (60 FPS for smoother motion)
+      const canvasStream = (canvas as any).captureStream ? (canvas as any).captureStream(60) : (canvas as any).mozCaptureStream(60);
       const canvasVideoTrack = canvasStream.getVideoTracks()[0];
 
       // 2. Build Audio Web Audio merge
@@ -412,7 +412,11 @@ export default function Recorder() {
       mimeTypeRef.current = mimeType;
       extensionRef.current = extension;
 
-      const recorder = new MediaRecorder(combinedStream, { mimeType });
+      // Initialize with high bitrate for crisp video (8 Mbps)
+      const recorder = new MediaRecorder(combinedStream, { 
+        mimeType,
+        videoBitsPerSecond: 8000000 
+      });
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
