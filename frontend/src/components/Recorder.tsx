@@ -5,9 +5,11 @@ import {
   Video, AlertTriangle, ArrowLeft, Loader2, Sparkles 
 } from 'lucide-react';
 import { API_BASE } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 export default function Recorder() {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [streamReady, setStreamReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -501,6 +503,9 @@ export default function Recorder() {
 
       const response = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       });
 

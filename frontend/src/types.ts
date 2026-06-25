@@ -5,4 +5,6 @@ export interface Recording {
   createdAt: string;
   fileName: string;
   size: number;
+  userId?: string;
 }
+

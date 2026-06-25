@@ -1,11 +1,13 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffmpeg from 'fluent-ffmpeg';
-import { Recording } from './types';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { Recording, User, AuthenticatedRequest } from './types';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -57,6 +59,8 @@ app.use((req, res, next) => {
 app.use(cors());
 app.use(express.json());
 
+const JWT_SECRET = process.env.JWT_SECRET || 'capto-fallback-secret-key-12345';
+
 // Ensure directories exist
 const uploadsDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -66,6 +70,11 @@ if (!fs.existsSync(uploadsDir)) {
 const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'recordings.json');
 if (!fs.existsSync(dbPath)) {
   fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
+}
+
+const usersDbPath = process.env.USERS_DB_PATH || path.join(process.cwd(), 'users.json');
+if (!fs.existsSync(usersDbPath)) {
+  fs.writeFileSync(usersDbPath, JSON.stringify([], null, 2));
 }
 
 // Read database
@@ -86,6 +95,44 @@ function writeDB(data: Recording[]): void {
   } catch (err) {
     console.error('Error writing DB:', err);
   }
+}
+
+// Read Users database
+function readUsersDB(): User[] {
+  try {
+    const data = fs.readFileSync(usersDbPath, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('Error reading Users DB, resetting:', err);
+    return [];
+  }
+}
+
+// Write Users database
+function writeUsersDB(data: User[]): void {
+  try {
+    fs.writeFileSync(usersDbPath, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error('Error writing Users DB:', err);
+  }
+}
+
+// Authentication Middleware
+function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = decoded as { id: string; email: string };
+    next();
+  });
 }
 
 // Serve uploaded videos statically
@@ -116,8 +163,91 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit for demo recordings
 });
 
+// Auth Endpoints
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    if (!email.includes('@')) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    const users = readUsersDB();
+    const normalizedEmail = email.toLowerCase().trim();
+    if (users.some(u => u.email === normalizedEmail)) {
+      return res.status(400).json({ error: 'Email is already registered' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const newUser: User = {
+      id: 'user-' + Date.now() + '-' + Math.round(Math.random() * 1e9),
+      email: normalizedEmail,
+      passwordHash,
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    writeUsersDB(users);
+
+    const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+    res.status(201).json({
+      token,
+      user: {
+        id: newUser.id,
+        email: newUser.email
+      }
+    });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const users = readUsersDB();
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = users.find(u => u.email === normalizedEmail);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Failed to log in' });
+  }
+});
+
+app.get('/api/auth/me', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+  res.json({ user: req.user });
+});
+
 // Upload endpoint
-app.post('/api/upload', upload.single('video'), async (req: Request, res: Response) => {
+app.post('/api/upload', authenticateToken, upload.single('video'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file uploaded' });
@@ -154,7 +284,8 @@ app.post('/api/upload', upload.single('video'), async (req: Request, res: Respon
       duration: parseFloat(duration) || 0,
       createdAt: new Date().toISOString(),
       fileName: finalFileName,
-      size: finalSize
+      size: finalSize,
+      userId: req.user?.id
     };
 
     db.push(newRecording);
@@ -168,11 +299,13 @@ app.post('/api/upload', upload.single('video'), async (req: Request, res: Respon
 });
 
 // List all recordings
-app.get('/api/recordings', (req: Request, res: Response) => {
+app.get('/api/recordings', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
   try {
     const db = readDB();
+    // Only return recordings belonging to the current user
+    const userRecordings = db.filter(r => r.userId === req.user?.id);
     // Return sorted by date descending (latest first)
-    const sorted = db.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const sorted = userRecordings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     res.json(sorted);
   } catch (err) {
     console.error('Get recordings error:', err);
@@ -196,12 +329,17 @@ app.get('/api/recordings/:id', (req: Request, res: Response) => {
 });
 
 // Delete a recording
-app.delete('/api/recordings/:id', (req: Request, res: Response) => {
+app.delete('/api/recordings/:id', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
   try {
     const db = readDB();
     const index = db.findIndex(r => r.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Recording not found' });
+    }
+
+    const recording = db[index];
+    if (recording.userId && recording.userId !== req.user?.id) {
+      return res.status(403).json({ error: 'You are not authorized to delete this recording' });
     }
 
     const [deleted] = db.splice(index, 1);

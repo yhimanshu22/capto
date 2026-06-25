@@ -7,8 +7,10 @@ import {
 import { Recording } from '../types';
 import Modal from './Modal';
 import { API_BASE } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
+  const { token } = useAuth();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,11 @@ export default function Dashboard() {
   const fetchRecordings = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/recordings`);
+      const response = await fetch(`${API_BASE}/api/recordings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (!response.ok) {
         throw new Error('Failed to load recordings');
       }
@@ -79,6 +85,9 @@ export default function Dashboard() {
         try {
           const response = await fetch(`${API_BASE}/api/recordings/${id}`, {
             method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
           });
           if (response.ok) {
             setRecordings(prev => prev.filter(rec => rec.id !== id));

@@ -7,10 +7,12 @@ import {
 import { Recording } from '../types';
 import Modal from './Modal';
 import { API_BASE } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, user, token } = useAuth();
   const [recording, setRecording] = useState<Recording | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +93,9 @@ export default function Player() {
         try {
           const response = await fetch(`${API_BASE}/api/recordings/${recording.id}`, {
             method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
           });
           if (response.ok) {
             navigate('/library');
@@ -206,13 +211,15 @@ export default function Player() {
             <Download size={16} />
             <span>Download</span>
           </a>
-          <button 
-            onClick={handleDelete} 
-            className="p-2 border border-red-100 rounded-xl hover:bg-red-50 hover:border-red-200 text-red-500 transition-colors cursor-pointer"
-            title="Delete recording"
-          >
-            <Trash2 size={16} />
-          </button>
+          {isAuthenticated && (!recording.userId || recording.userId === user?.id) && (
+            <button 
+              onClick={handleDelete} 
+              className="p-2 border border-red-100 rounded-xl hover:bg-red-50 hover:border-red-200 text-red-500 transition-colors cursor-pointer"
+              title="Delete recording"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       </div>
 

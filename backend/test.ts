@@ -7,6 +7,7 @@ test('Capto Backend API Integration Tests', async (t) => {
   let server: any;
   let port: number;
   let baseUrl: string;
+  let token: string = '';
 
   // Setup: Start server on an ephemeral port before running tests
   await new Promise<void>((resolve) => {
@@ -23,8 +24,44 @@ test('Capto Backend API Integration Tests', async (t) => {
     server.close();
   });
 
-  await t.test('GET /api/recordings returns successfully', async () => {
+  const testEmail = `test-${Date.now()}@example.com`;
+  const testPassword = 'password123';
+
+  await t.test('POST /api/auth/register - successfully registers', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testEmail, password: testPassword })
+    });
+    assert.strictEqual(res.status, 201);
+    const data: any = await res.json();
+    assert.ok(data.token, 'Expected token to be present');
+    assert.strictEqual(data.user.email, testEmail);
+    token = data.token;
+  });
+
+  await t.test('POST /api/auth/login - successfully logs in', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testEmail, password: testPassword })
+    });
+    assert.strictEqual(res.status, 200);
+    const data: any = await res.json();
+    assert.ok(data.token, 'Expected token to be present');
+  });
+
+  await t.test('GET /api/recordings - unauthorized without token', async () => {
     const res = await fetch(`${baseUrl}/api/recordings`);
+    assert.strictEqual(res.status, 401);
+    const data: any = await res.json();
+    assert.strictEqual(data.error, 'Authentication token required');
+  });
+
+  await t.test('GET /api/recordings - authorized with token', async () => {
+    const res = await fetch(`${baseUrl}/api/recordings`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.ok(Array.isArray(data), 'Expected recordings response to be an array');
@@ -37,11 +74,23 @@ test('Capto Backend API Integration Tests', async (t) => {
     assert.strictEqual(data.error, 'Recording not found');
   });
 
-  await t.test('POST /api/upload without file attachment fails with 400', async () => {
+  await t.test('POST /api/upload without authentication fails with 401', async () => {
     const res = await fetch(`${baseUrl}/api/upload`, {
       method: 'POST',
       body: JSON.stringify({ title: 'Test recording', duration: '12.5' }),
       headers: { 'Content-Type': 'application/json' }
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  await t.test('POST /api/upload with auth but without file attachment fails with 400', async () => {
+    const res = await fetch(`${baseUrl}/api/upload`, {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Test recording', duration: '12.5' }),
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
     });
     assert.strictEqual(res.status, 400);
     const data: any = await res.json();
@@ -50,7 +99,8 @@ test('Capto Backend API Integration Tests', async (t) => {
 
   await t.test('DELETE /api/recordings/:id with unknown ID returns 404', async () => {
     const res = await fetch(`${baseUrl}/api/recordings/unknown-id-12345`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     assert.strictEqual(res.status, 404);
     const data: any = await res.json();
